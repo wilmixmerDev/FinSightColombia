@@ -1,0 +1,14 @@
+# Esenciales
+.env
+venv/
+__pycache__/
+
+# Archivos pesados o privados
+modelos/*.joblib
+datos/brutos/*.csv
+datos/procesados/*.csv
+registros/*.log
+
+# IDEs
+.vscode/
+.idea/
