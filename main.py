@@ -1,70 +1,29 @@
-"""
-main.py — Punto de entrada de la aplicación FastAPI.
-Registra todos los routers y arranca el servidor con uvicorn.
-"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.rutas import mercado, prediccion, noticias
+from api.rutas import noticias, prediccion, scraper, auth, mercado
 import uvicorn
 
-# Crear aplicación FastAPI
-app = FastAPI(
-    title="FinSight Colombia API",
-    description="API para predicciones de indicadores financieros colombianos",
-    version="1.0.0 - SIMULACION (sin BD)"
-)
+app = FastAPI(title="FinSight Colombia API", version="1.0.0")
 
-# Configurar CORS para permitir el frontend React
+# Configuración de CORS para que el dashboard de React pueda conectarse
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # En producción, especificar dominios
+    allow_origins=["*"], # En producción se debe restringir a la URL del dashboard
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Registrar routers
-try:
-    app.include_router(mercado.router)
-    app.include_router(prediccion.router)
-    app.include_router(noticias.router)
-except Exception as e:
-    print(f"⚠️ Aviso al registrar routers: {e}")
+# Inclusión de rutas
+app.include_router(noticias.router)
+app.include_router(prediccion.router)
+app.include_router(scraper.router)
+app.include_router(auth.router)
+app.include_router(mercado.router)
 
 @app.get("/")
-async def root():
-    """Endpoint raíz con información de la API."""
-    return {
-        "nombre": "FinSight Colombia",
-        "version": "1.0.0 - SIMULACION",
-        "descripcion": "Predicción de indicadores financieros con IA (SIN BD)",
-        "modo": "SIMULACION - Datos en memoria",
-        "endpoints": {
-            "mercado": "/mercado/tendencia",
-            "predicción": "/prediccion/hoy",
-            "noticias": "/noticias/recientes",
-            "docs": "/docs"
-        }
-    }
-
-@app.get("/health")
-async def health_check():
-    """Verificar salud de la API."""
-    return {"status": "ok", "modo": "simulacion"}
+def home():
+    return {"status": "online", "mensaje": "Bienvenido a FinSight Colombia API"}
 
 if __name__ == "__main__":
-    # Ejecutar con: python main.py
-    print("\n" + "="*60)
-    print("🚀 FinSight Colombia - MVP en SIMULACIÓN")
-    print("="*60)
-    print("✅ Modo: SIN BASE DE DATOS (datos en memoria)")
-    print("📊 API en: http://localhost:8000")
-    print("📚 Docs en: http://localhost:8000/docs")
-    print("="*60 + "\n")
-    
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

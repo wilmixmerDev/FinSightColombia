@@ -1,8 +1,7 @@
 """
-extraccion/__init__.py — Expone todos los raspadores como paquete Python.
+extraccion/__init__.py — Expone los raspadores funcionales.
 """
 from extraccion.portafolio import RaspadorPortafolio
 from extraccion.larepublica import RaspadorLaRepublica
-from extraccion.dinero import RaspadorDinero
-from extraccion.eltiempo import RaspadorElTiempo
-from extraccion.semana import RaspadorSemana
+
+# Los demás raspadores están pendientes de implementación completa

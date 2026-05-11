@@ -20,39 +20,31 @@ class RaspadorPortafolio(RaspadorBase):
             for url in self.urls_objetivo:
                 page = await self.obtener_pagina(browser, url)
                 
-                # Buscamos los contenedores de noticias
-                # Selectores típicos de Portafolio (pueden variar, se ajustan en campo)
-                articulos = await page.query_selector_all("div.listing-item, article")
+                # Nuevos selectores de Portafolio (Actualizado 2026)
+                articulos = await page.query_selector_all(".c-articulo__titulo__txt")
                 
-                for art in articulos[:10]: # Tomamos las 10 más recientes por sección
+                for art in articulos[:10]:
                     try:
-                        titulo_elem = await art.query_selector("h2 a, .title a")
-                        resumen_elem = await art.query_selector(".description, p")
+                        titulo = (await art.inner_text()).strip()
+                        enlace = await art.get_attribute("href")
                         
-                        if titulo_elem:
-                            titulo = (await titulo_elem.inner_text()).strip()
-                            enlace = await titulo_elem.get_attribute("href")
-                            if enlace and enlace.startswith("/"):
-                                enlace = f"https://www.portafolio.co{enlace}"
-                            
-                            resumen = ""
-                            if resumen_elem:
-                                resumen = (await resumen_elem.inner_text()).strip()
-
-                            noticia = {
-                                "fuente": self.fuente,
-                                "url": enlace,
-                                "titulo": titulo,
-                                "resumen": resumen,
-                                "fecha": datetime.now().date(),
-                                "categoria": "Economía/Negocios",
-                                "sentimiento": None, # Se llena en PASO 5
-                                "puntaje": None,     # Se llena en PASO 5
-                                "tema": "General"    # Se clasifica en PASO 5
-                            }
-                            
-                            guardar_noticia(noticia)
-                            print(f"Noticia capturada: {titulo[:50]}...")
+                        if enlace and enlace.startswith("/"):
+                            enlace = f"https://www.portafolio.co{enlace}"
+                        
+                        noticia = {
+                            "fuente": self.fuente,
+                            "url": enlace,
+                            "titulo": titulo,
+                            "resumen": "",
+                            "fecha": datetime.now().date(),
+                            "categoria": "Economía/Negocios",
+                            "sentimiento": None,
+                            "puntaje": None,
+                            "tema": "TRM" 
+                        }
+                        
+                        guardar_noticia(noticia)
+                        print(f"Noticia capturada: {titulo[:50]}...")
                             
                     except Exception as e:
                         print(f"Error procesando artículo en Portafolio: {e}")

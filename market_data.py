@@ -8,7 +8,7 @@ def descargar_trm_historica(dias=365):
     """Descarga el precio del dólar (COP=X) desde Yahoo Finance."""
     print(f"Descargando TRM de los últimos {dias} días...")
     try:
-        ticker = "COP=X"
+        ticker = "USDCOP=X"
         fin = datetime.now()
         inicio = fin - timedelta(days=dias)
         
@@ -44,20 +44,12 @@ def descargar_datos_banrep():
     # En un caso real, BanRep tiene una API (SICEP) o archivos fijos
     # Aquí simulamos la captura de los valores más recientes
     try:
-        # Tasa de intervención actual (aproximada para el flujo)
-        # En producción se usaría: https://www.banrep.gov.co/es/estadisticas/tasas-intervencion
-        tasa_actual = 11.75
-        fecha_actual = datetime.now().date()
-        guardar_dato_mercado('Tasas BanRep', tasa_actual, fecha_actual, 'BanRep')
-        
-        # Inflación (IPC) - Variación anual
-        # En producción se usaría: https://www.banrep.gov.co/es/estadisticas/indice-precios-consumidor-ipc
-        inflacion_actual = 7.16
-        guardar_dato_mercado('Inflacion', inflacion_actual, fecha_actual, 'BanRep')
-        
-        print("Datos de BanRep actualizados (Tasas e Inflación)")
+        # Aquí se integraría la descarga de los CSV oficiales del BanRep
+        # Por ahora, solo descargamos la TRM que es 100% automatizada.
+        print("Módulo BanRep: Integración con series de tiempo CSV pendiente.")
+        pass
     except Exception as e:
-        print(f"Error al descargar datos de BanRep: {e}")
+        print(f"Error al procesar datos de BanRep: {e}")
 
 if __name__ == "__main__":
     # Si se ejecuta este script directamente, actualiza todo

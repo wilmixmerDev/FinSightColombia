@@ -12,8 +12,8 @@ import random
 # Cargamos variables de entorno
 load_dotenv()
 
-# MODO SIMULACIÓN - Datos en memoria
-MODO_SIMULACION = True
+# MODO SIMULACIÓN - Desactivado para usar Postgres real
+MODO_SIMULACION = False
 DATOS_SIMULADOS = {
     'noticias': [],
     'datos_mercado': [],
@@ -137,6 +137,16 @@ def ejecutar_consulta(query, params=None, es_select=True):
     return resultado
 
 # --- Funciones CRUD específicas ---
+
+def guardar_indice_sentimiento(tema, fecha, indice, volumen):
+    """Guarda un índice de sentimiento en la BD."""
+    sql = """
+        INSERT INTO indices_sentimiento (tema, fecha, indice, volumen)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (tema, fecha) DO UPDATE SET
+        indice = EXCLUDED.indice, volumen = EXCLUDED.volumen
+    """
+    return ejecutar_consulta(sql, (tema, fecha, indice, volumen), es_select=False)
 
 def guardar_noticia(datos):
     """Guarda una noticia (simulado)."""

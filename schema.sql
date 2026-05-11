@@ -54,8 +54,18 @@ CREATE TABLE IF NOT EXISTS comparativo (
     variable VARCHAR(50) NOT NULL,
     prediccion_hecha VARCHAR(50) NOT NULL,
     valor_real FLOAT,
-    acierto BOOLEAN,
+    tasa_acierto FLOAT,
     UNIQUE(fecha, variable)
+);
+
+-- Tabla de Usuarios para Autenticación
+CREATE TABLE IF NOT EXISTS usuarios (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(100),
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    rol VARCHAR(20) DEFAULT 'admin',
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Índices para mejorar velocidad de consulta
