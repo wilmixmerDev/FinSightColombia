@@ -1,9 +1,6 @@
-import asyncio
-import json
 import threading
 from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
-from market_data import descargar_trm_historica
+from seed_trm import obtener_trm_banrep, generar_trm_aproximada
 from extraccion.portafolio import RaspadorPortafolio
 from extraccion.larepublica import RaspadorLaRepublica
 from extraccion.eltiempo import RaspadorElTiempo
@@ -83,8 +80,18 @@ def _run_scraper_sync():
     # 1. Mercado
     log("[1/5] Descargando datos de mercado TRM...")
     try:
-        descargar_trm_historica(7)
-        log("  OK: Datos de mercado actualizados")
+        from datetime import date, timedelta
+        fecha_ini = date.today() - timedelta(days=7)
+        datos = obtener_trm_banrep(fecha_ini, date.today())
+        if len(datos) < 2:
+            datos = generar_trm_aproximada(7)
+        for fecha, valor in datos.items():
+            ejecutar_consulta(
+                "INSERT INTO datos_mercado (variable, valor, fecha, fuente) VALUES (%s,%s,%s,%s) ON CONFLICT (variable,fecha) DO UPDATE SET valor=EXCLUDED.valor",
+                ('TRM', valor, str(fecha), 'BanRep / datos.gov.co'),
+                es_select=False
+            )
+        log(f"  OK: {len(datos)} días de TRM actualizados")
     except Exception as e:
         log(f"  X Error en datos de mercado: {e}")
 
@@ -180,22 +187,6 @@ async def ejecutar_scraper():
 async def obtener_logs():
     return {"logs": scraper_logs, "running": scraper_running}
 
-@router.get("/logs/stream")
-async def stream_logs():
-    async def generate():
-        last_index = 0
-        timeout = 0
-        while timeout < 120:
-            if last_index < len(scraper_logs):
-                for i in range(last_index, len(scraper_logs)):
-                    yield f"data: {json.dumps({'msg': scraper_logs[i], 'index': i})}\n\n"
-                last_index = len(scraper_logs)
-            if not scraper_running and last_index >= len(scraper_logs) and last_index > 0:
-                yield f"data: {json.dumps({'done': True})}\n\n"
-                break
-            await asyncio.sleep(0.5)
-            timeout += 0.5
-    return StreamingResponse(generate(), media_type="text/event-stream")
 
 @router.get("/estado")
 def consultar_estado():

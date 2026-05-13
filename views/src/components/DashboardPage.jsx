@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import CardPrediccion from './CardPrediccion';
+
 import {
   RefreshCw, Users, Activity, Zap, BarChart3, Database,
   LogOut, Terminal, CheckCircle, ArrowUpRight, TrendingUp,
@@ -39,7 +39,7 @@ export default function DashboardPage() {
   const positivePct = noticias.length ? Math.round((noticiasPositivas / noticias.length) * 100) : 0;
   const trmActual   = mercadoHistorico[0]?.valor ?? null;
   const ultimaFecha = mercadoHistorico[0]?.fecha
-    ? new Date(mercadoHistorico[0].fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
+    ? new Date(String(mercadoHistorico[0].fecha).slice(0,10)+'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
     : '—';
 
   const fuentes = ['Todas', 'Portafolio', 'La República', 'El Tiempo', 'Semana'];
@@ -119,7 +119,7 @@ export default function DashboardPage() {
     const projColor = predTRM?.prediccion === 'sube' ? '#22c55e' : '#ef4444';
     return {
       labels: [
-        ...asc.map(m => new Date(m.fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })),
+        ...asc.map(m => new Date(String(m.fecha).slice(0,10)+'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })),
         'Mañana',
       ],
       datasets: [
@@ -222,7 +222,7 @@ export default function DashboardPage() {
         <nav style={{ flex:1, display:'flex', flexDirection:'column', gap:'0.4rem', width:'100%' }}>
           <button className="icon-btn active" title="Dashboard"><BarChart3 size={20} /></button>
           {esAdmin && <button className="icon-btn" onClick={() => navigate('/usuarios')} title="Usuarios"><Users size={20} /></button>}
-          <button className="icon-btn" title="Base de datos"><Database size={20} /></button>
+          <button className="icon-btn" onClick={() => setTabActiva('mercado')} title="Datos históricos TRM"><Database size={20} /></button>
         </nav>
         <button className="icon-btn danger" onClick={() => { localStorage.clear(); navigate('/login'); }} title="Cerrar sesión">
           <LogOut size={20} />
@@ -255,9 +255,9 @@ export default function DashboardPage() {
               <p style={{ fontSize:'0.57rem', fontWeight:700, letterSpacing:'0.2em', textTransform:'uppercase', color:'var(--text-3)', marginTop:'0.1rem' }}>{esAdmin ? 'Administrador' : 'Analista'}</p>
             </div>
             <button className="btn-ghost" onClick={limpiarBD}>Limpiar BD</button>
-            <button className="btn-primary" onClick={iniciarScraping} disabled={scraping} style={{ whiteSpace:'nowrap' }}>
+            <button className="btn-primary" onClick={iniciarScraping} disabled={scraping || scraperDone} style={{ whiteSpace:'nowrap' }}>
               <RefreshCw size={14} style={{ animation: scraping ? 'spin 1s linear infinite' : 'none' }} />
-              {scraping ? 'Extrayendo datos…' : 'Extraer datos'}
+              {scraping ? 'Extrayendo datos…' : scraperDone ? 'Datos actualizados' : 'Extraer datos'}
             </button>
           </div>
         </header>
@@ -350,7 +350,7 @@ export default function DashboardPage() {
 
             {/* 2 ── Stats bar */}
             <div className="card" style={{ padding:'0.8rem' }}>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'0.6rem' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'0.6rem' }}>
 
                 {/* Noticias cargadas */}
                 <div className="stat-cell">
@@ -398,45 +398,9 @@ export default function DashboardPage() {
                   }
                 </div>
 
-                {/* Predicciones */}
-                <div className="stat-cell">
-                  <p className="stat-cell-label">Predicciones</p>
-                  <p className="stat-cell-value">{predicciones.length}</p>
-                  {predicciones.length > 0
-                    ? <span className="stat-cell-badge badge-neutral">Modelo activo</span>
-                    : <span style={{ fontSize:'0.68rem', color:'var(--text-3)', marginTop:'0.4rem', display:'block' }}>Genera al scrapear</span>
-                  }
-                </div>
-
               </div>
             </div>
 
-            {/* 3 ── Prediction cards */}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'0.65rem' }}>
-              {predicciones.length > 0
-                ? predicciones.map((p, i) => (
-                  <motion.div key={i} initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} transition={{ delay: i * 0.1 }}>
-                    <CardPrediccion
-                      titulo={p.variable}
-                      valor={`Tendencia: ${p.prediccion.toUpperCase()}`}
-                      tendencia={p.prediccion}
-                      confianza={Math.round(p.confianza)}
-                      icono={Activity}
-                    />
-                  </motion.div>
-                ))
-                : (
-                  <div style={{ gridColumn:'span 3' }}>
-                    {cargando
-                      ? <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'0.65rem' }}>
-                          {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height:'150px', borderRadius:'1.5rem' }} />)}
-                        </div>
-                      : <EmptyState text="Sin predicciones — extrae datos para generar el modelo" />
-                    }
-                  </div>
-                )
-              }
-            </div>
 
             {/* 4 ── Análisis del Día */}
             {(() => {
@@ -530,12 +494,20 @@ export default function DashboardPage() {
                     Pronóstico basado en análisis de sentimiento multi-fuente
                   </p>
                 </div>
-                {trmActual && (
-                  <div style={{ flexShrink:0, padding:'0.55rem 0.9rem', background:'var(--blue-dim)', border:'1px solid var(--blue-border)', borderRadius:'var(--radius-md)', textAlign:'right' }}>
-                    <p className="label" style={{ color:'var(--blue)' }}>Sentimiento</p>
-                    <p style={{ fontFamily:'var(--font-title)', fontSize:'0.95rem', fontWeight:900, marginTop:'0.15rem' }}>{positivePct}% positivo</p>
-                  </div>
-                )}
+                {trmActual && noticias.length > 0 && (() => {
+                  const isPos = positivePct >= 50;
+                  const pct   = isPos ? positivePct : (100 - positivePct);
+                  const label = isPos ? 'positivo' : 'negativo';
+                  const col   = isPos ? 'var(--green)' : 'var(--red)';
+                  const bg    = isPos ? 'var(--green-dim)' : 'var(--red-dim)';
+                  const border= isPos ? '1px solid rgba(34,197,94,0.25)' : '1px solid rgba(239,68,68,0.25)';
+                  return (
+                    <div style={{ flexShrink:0, padding:'0.55rem 0.9rem', background:bg, border:border, borderRadius:'var(--radius-md)', textAlign:'right' }}>
+                      <p className="label" style={{ color:col }}>Sentimiento</p>
+                      <p style={{ fontFamily:'var(--font-title)', fontSize:'0.95rem', fontWeight:900, marginTop:'0.15rem', color:col }}>{pct}% {label}</p>
+                    </div>
+                  );
+                })()}
               </div>
               <div style={{ width:'100%', height:'210px', position:'relative' }}>
                 {trmChartData
@@ -618,8 +590,8 @@ export default function DashboardPage() {
                             background:'var(--blue-dim)', border:'1px solid var(--blue-border)',
                             display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', flexShrink:0,
                           }}>
-                            <span style={{ color:'var(--blue)', fontSize:'0.82rem', fontWeight:900, lineHeight:1 }}>{new Date(m.fecha).getDate()}</span>
-                            <span className="label" style={{ fontSize:'0.48rem' }}>{new Date(m.fecha).toLocaleDateString('es-CO',{month:'short'})}</span>
+                            <span style={{ color:'var(--blue)', fontSize:'0.82rem', fontWeight:900, lineHeight:1 }}>{new Date(String(m.fecha).slice(0,10)+'T12:00:00').getDate()}</span>
+                            <span className="label" style={{ fontSize:'0.48rem' }}>{new Date(String(m.fecha).slice(0,10)+'T12:00:00').toLocaleDateString('es-CO',{month:'short'})}</span>
                           </div>
                           <span style={{ fontSize:'0.83rem', fontWeight:700, color:'var(--text-1)' }}>
                             ${m.valor.toLocaleString('es-CO')}

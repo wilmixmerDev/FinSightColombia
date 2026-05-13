@@ -9,16 +9,6 @@ def obtener_noticias(limit: int = 10):
     sql = "SELECT * FROM noticias ORDER BY id DESC LIMIT %s"
     return ejecutar_consulta(sql, (limit,))
 
-@router.get("/estadisticas")
-def obtener_estadisticas_noticias():
-    """Retorna conteo de noticias por sentimiento del día actual."""
-    sql = """
-        SELECT sentimiento, COUNT(*) 
-        FROM noticias 
-        WHERE fecha = CURRENT_DATE 
-        GROUP BY sentimiento
-    """
-    return ejecutar_consulta(sql)
 
 @router.get("/sentimiento-historial")
 def obtener_sentimiento_historial(tema: str = "TRM"):
