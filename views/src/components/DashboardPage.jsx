@@ -1,313 +1,642 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import CardPrediccion from './CardPrediccion';
-import { 
-  DollarSign, RefreshCw, Users, Search, AlertCircle, Play, 
-  Filter, TrendingUp, Newspaper, ChevronRight, Activity, 
-  Globe, Zap, ArrowUpRight, BarChart3, Clock, Database,
-  Settings, LogOut
+import {
+  RefreshCw, Users, Activity, Zap, BarChart3, Database,
+  LogOut, Terminal, CheckCircle, ArrowUpRight, TrendingUp,
+  Inbox, ExternalLink,
 } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
+import {
+  Chart as ChartJS, CategoryScale, LinearScale, PointElement,
+  LineElement, Title, Tooltip, Legend, Filler,
+} from 'chart.js';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
-const API_BASE = "http://127.0.0.1:8000";
+const API = 'http://127.0.0.1:8000';
+const now = () => new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-const DashboardPage = () => {
-  const [noticias, setNoticias] = useState([]);
-  const [predicciones, setPredicciones] = useState([]);
-  const [historialSentimiento, setHistorialSentimiento] = useState([]);
-  const [mercadoHistorico, setMercadoHistorico] = useState([]);
-  const [fuenteSeleccionada, setFuenteSeleccionada] = useState('Todas');
-  const [tabSeleccionada, setTabSeleccionada] = useState('noticias');
-  const [cargando, setCargando] = useState(false);
-  const [ejecutandoScraper, setEjecutandoScraper] = useState(false);
+export default function DashboardPage() {
+  const [noticias,            setNoticias]            = useState([]);
+  const [predicciones,        setPredicciones]        = useState([]);
+  const [mercadoHistorico,    setMercadoHistorico]    = useState([]);
+  const [historialSentimiento,setHistorialSentimiento]= useState([]);
+  const [fuenteSeleccionada,  setFuenteSeleccionada]  = useState('Todas');
+  const [tabActiva,        setTabActiva]        = useState('noticias');
+  const [scraping,         setScraping]         = useState(false);
+  const [scraperDone,      setScraperDone]      = useState(false);
+  const [logs,             setLogs]             = useState([]);
+  const [cargando,         setCargando]         = useState(true);
+  const logsRef = useRef(null);
   const navigate = useNavigate();
+
   const esAdmin = localStorage.getItem('rol') === 'admin';
   const usuario = localStorage.getItem('user') || 'Analista';
 
-  const fuentes = ['Todas', 'Portafolio', 'La República', 'El Tiempo', 'Semana', 'Dinero'];
+  const noticiasPositivas = noticias.filter(n => n.sentimiento === 'POS').length;
+  const positivePct = noticias.length ? Math.round((noticiasPositivas / noticias.length) * 100) : 0;
+  const trmActual   = mercadoHistorico[0]?.valor ?? null;
+  const ultimaFecha = mercadoHistorico[0]?.fecha
+    ? new Date(mercadoHistorico[0].fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
+    : '—';
+
+  const fuentes = ['Todas', 'Portafolio', 'La República', 'El Tiempo', 'Semana'];
 
   const cargarDatos = async () => {
-    setCargando(true);
     try {
-      const resNoticias = await fetch(`${API_BASE}/noticias/?limit=30`);
-      const dataNoticias = await resNoticias.json();
-      setNoticias(Array.isArray(dataNoticias) ? dataNoticias : []);
-
-      const resPred = await fetch(`${API_BASE}/prediccion/actual`);
-      const dataPred = await resPred.json();
-      setPredicciones(Array.isArray(dataPred) ? dataPred : []);
-
-      const resHist = await fetch(`${API_BASE}/noticias/sentimiento-historial?tema=TRM`);
-      const dataHist = await resHist.json();
-      setHistorialSentimiento(Array.isArray(dataHist) ? dataHist : []);
-
-      const resMercado = await fetch(`${API_BASE}/mercado/historico?variable=TRM&limit=15`);
-      const dataMercado = await resMercado.json();
-      setMercadoHistorico(Array.isArray(dataMercado) ? dataMercado : []);
-      
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setTimeout(() => setCargando(false), 800);
-    }
+      const [r1, r2, r3, r4] = await Promise.all([
+        fetch(`${API}/noticias/?limit=30`).then(r => r.json()).catch(() => []),
+        fetch(`${API}/prediccion/actual`).then(r => r.json()).catch(() => []),
+        fetch(`${API}/mercado/historico?variable=TRM&limit=15`).then(r => r.json()).catch(() => []),
+        fetch(`${API}/noticias/sentimiento-historial?tema=TRM`).then(r => r.json()).catch(() => []),
+      ]);
+      setNoticias(Array.isArray(r1) ? r1 : []);
+      setPredicciones(Array.isArray(r2) && r2.length > 0 ? r2 : []);
+      setMercadoHistorico(Array.isArray(r3) ? r3 : []);
+      setHistorialSentimiento(Array.isArray(r4) ? r4 : []);
+    } catch (e) { console.error(e); }
+    finally { setCargando(false); }
   };
 
   const iniciarScraping = async () => {
-    setEjecutandoScraper(true);
-    try {
-      await fetch(`${API_BASE}/scraper/ejecutar`, { method: 'POST' });
-      setTimeout(cargarDatos, 5000);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setEjecutandoScraper(false);
+    setScraping(true); setScraperDone(false); setLogs([]);
+    await fetch(`${API}/scraper/ejecutar`, { method: 'POST' }).catch(() => {});
+    let backendLogs = []; let attempts = 0;
+    while (attempts < 120) {
+      await new Promise(r => setTimeout(r, 1500));
+      try {
+        const res  = await fetch(`${API}/scraper/logs`);
+        const data = await res.json();
+        backendLogs = data.logs || [];
+        const ts = now();
+        setLogs(backendLogs.map(msg => ({ ts, msg })));
+        if (!data.running && backendLogs.length > 0) break;
+      } catch (e) { console.error(e); }
+      attempts++;
     }
+    if (backendLogs.length > 0) {
+      setLogs([]);
+      for (let i = 0; i < backendLogs.length; i++) {
+        await new Promise(r => setTimeout(r, 250));
+        setLogs(prev => [...prev, { ts: now(), msg: backendLogs[i] }]);
+      }
+    }
+    await new Promise(r => setTimeout(r, 800));
+    await cargarDatos();
+    setScraping(false); setScraperDone(true);
   };
 
+  const limpiarBD = async () => {
+    if (!window.confirm('¿Limpiar datos? Se eliminarán noticias, predicciones e índices.\nLos datos TRM históricos se conservarán.')) return;
+    await fetch(`${API}/scraper/limpiar`, { method: 'POST' });
+    setNoticias([]); setPredicciones([]);
+    setScraperDone(false); setLogs([]);
+    // Reload market data (should still be intact)
+    const r = await fetch(`${API}/mercado/historico?variable=TRM&limit=15`).then(r => r.json()).catch(() => []);
+    setMercadoHistorico(Array.isArray(r) ? r : []);
+  };
+
+  useEffect(() => { cargarDatos(); }, []);
   useEffect(() => {
-    cargarDatos();
-  }, []);
+    if (logsRef.current) logsRef.current.scrollTop = logsRef.current.scrollHeight;
+  }, [logs]);
 
   const noticiasFiltradas = useMemo(() => {
     if (fuenteSeleccionada === 'Todas') return noticias;
     return noticias.filter(n => n.fuente === fuenteSeleccionada);
   }, [noticias, fuenteSeleccionada]);
 
-  const chartData = {
-    labels: historialSentimiento.length > 0 
-      ? historialSentimiento.map(h => new Date(h.fecha).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })) 
-      : ['01 May', '05 May', '10 May', '15 May', '20 May'],
-    datasets: [{
-      label: 'Sentimiento TRM',
-      data: historialSentimiento.length > 0 ? historialSentimiento.map(h => h.indice) : [0.1, 0.3, -0.2, 0.4, 0.2],
-      borderColor: '#3b82f6',
-      backgroundColor: (context) => {
-        const ctx = context.chart.ctx;
-        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-        gradient.addColorStop(0, 'rgba(59, 130, 246, 0.3)');
-        gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
-        return gradient;
-      },
-      fill: true,
-      tension: 0.4,
-      pointRadius: 4,
-      pointBackgroundColor: '#3b82f6',
-      pointBorderColor: '#020617',
-      pointBorderWidth: 2,
-    }]
-  };
+  // Chart data
+  const trmChartData = useMemo(() => {
+    const asc = [...mercadoHistorico].reverse();
+    if (!asc.length) return null;
+    const predTRM  = predicciones.find(p => p.variable === 'TRM');
+    const lastVal  = asc[asc.length - 1]?.valor || 0;
+    const projected = predTRM?.prediccion === 'sube' ? lastVal * 1.006
+      : predTRM?.prediccion === 'baja' ? lastVal * 0.994 : lastVal;
+    const projColor = predTRM?.prediccion === 'sube' ? '#22c55e' : '#ef4444';
+    return {
+      labels: [
+        ...asc.map(m => new Date(m.fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })),
+        'Mañana',
+      ],
+      datasets: [
+        {
+          label: 'TRM Histórica',
+          data: [...asc.map(m => m.valor), null],
+          borderColor: '#4f8cff',
+          borderWidth: 2.5,
+          backgroundColor: ctx => {
+            const { ctx: c, chartArea } = ctx.chart;
+            if (!chartArea) return 'transparent';
+            const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+            g.addColorStop(0, 'rgba(79,140,255,0.20)');
+            g.addColorStop(1, 'rgba(79,140,255,0)');
+            return g;
+          },
+          fill: true, tension: 0.4, pointRadius: 0, pointHoverRadius: 5,
+          pointHoverBackgroundColor: '#4f8cff',
+        },
+        {
+          label: 'Proyección',
+          data: [...asc.map(() => null).slice(0, -1), lastVal, projected],
+          borderColor: projColor,
+          borderWidth: 2.5,
+          borderDash: [7, 4],
+          tension: 0.4,
+          pointRadius: ctx => ctx.dataIndex === asc.length ? 7 : 0,
+          pointBackgroundColor: projColor,
+          pointBorderColor: '#060d19',
+          pointBorderWidth: 2,
+        },
+      ],
+    };
+  }, [mercadoHistorico, predicciones]);
 
-  const chartOptions = {
+  const chartOpts = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: { duration: 800, easing: 'easeInOutQuart' },
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#0f172a',
-        padding: 15,
-        titleFont: { size: 14, weight: 'bold', family: 'Outfit' },
-        bodyFont: { size: 13, family: 'Outfit' },
-        cornerRadius: 12,
-        borderColor: 'rgba(255,255,255,0.1)',
-        borderWidth: 1
-      }
+        backgroundColor: '#0d1825',
+        borderColor: 'rgba(79,140,255,0.3)',
+        borderWidth: 1,
+        padding: 12,
+        cornerRadius: 10,
+        titleColor: '#94a3b8',
+        bodyColor: '#f1f5f9',
+        callbacks: {
+          label: ctx => ` $${Number(ctx.raw).toLocaleString('es-CO')}`,
+        },
+      },
     },
     scales: {
-      y: { min: -1, max: 1, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', font: { size: 10 } } },
-      x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } }
-    }
+      y: {
+        grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+        ticks: { color: '#475569', font: { size: 10, family: 'Inter' }, callback: v => `$${Number(v).toLocaleString()}` },
+        border: { display: false },
+      },
+      x: {
+        grid: { display: false },
+        ticks: { color: '#475569', font: { size: 10, family: 'Inter' } },
+        border: { display: false },
+      },
+    },
   };
 
+  const [seedingTRM, setSeedingTRM] = useState(false);
+  const seedTRM = async () => {
+    setSeedingTRM(true);
+    try {
+      const r = await fetch(`${API}/scraper/seed-trm?dias=90`, { method:'POST' });
+      const d = await r.json();
+      console.log('Seed TRM:', d);
+      await cargarDatos();
+    } catch(e) { console.error(e); }
+    finally { setSeedingTRM(false); }
+  };
+
+  const EmptyState = ({ text }) => (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'0.6rem', padding:'2rem 1rem', color:'var(--text-3)' }}>
+      <Inbox size={26} style={{ opacity:0.35 }} />
+      <p style={{ fontSize:'0.76rem', fontWeight:600, textAlign:'center' }}>{text}</p>
+    </div>
+  );
+
+
+
   return (
-    <div className="flex min-h-screen bg-[#020617] text-slate-100 overflow-hidden font-['Outfit']">
-      <aside className="w-20 lg:w-64 border-r border-white/5 bg-slate-900/20 flex flex-col items-center lg:items-stretch p-6 gap-10">
-        <div className="flex items-center gap-3 px-2">
-          <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/20">
-            <Zap size={24} className="text-white fill-white" />
-          </div>
-          <h1 className="hidden lg:block text-xl font-black tracking-tighter">FINSIGHT</h1>
-        </div>
+    <div style={{ display:'flex', height:'100vh', overflow:'hidden', fontFamily:'var(--font-sans)', color:'var(--text-1)', background:'var(--bg)' }}>
 
-        <nav className="flex-1 flex flex-col gap-4">
-          <button className="flex items-center gap-4 p-3 bg-blue-600/10 text-blue-400 rounded-2xl border border-blue-500/20 font-bold">
-            <BarChart3 size={20} />
-            <span className="hidden lg:block">Dashboard</span>
-          </button>
-          <button className="flex items-center gap-4 p-3 text-slate-500 hover:text-slate-300 font-bold">
-            <Newspaper size={20} />
-            <span className="hidden lg:block">Noticias</span>
-          </button>
-          <button className="flex items-center gap-4 p-3 text-slate-500 hover:text-slate-300 font-bold">
-            <Database size={20} />
-            <span className="hidden lg:block">Mercados</span>
-          </button>
-          {esAdmin && (
-            <button onClick={() => navigate('/usuarios')} className="flex items-center gap-4 p-3 text-slate-500 hover:text-slate-300 font-bold">
-              <Users size={20} />
-              <span className="hidden lg:block">Equipo</span>
-            </button>
-          )}
+      <aside style={{
+        width:'72px', flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center',
+        gap:'0.75rem', margin:'0.75rem 0 0.75rem 0.75rem', padding:'1.25rem 0.75rem',
+        background:'var(--bg-sidebar)', border:'1px solid var(--border)', borderRadius:'1.5rem',
+        backdropFilter:'var(--blur)',
+      }}>
+        <div className="logo-icon" style={{ marginBottom:'0.5rem' }}><Zap size={20} fill="currentColor" /></div>
+        <nav style={{ flex:1, display:'flex', flexDirection:'column', gap:'0.4rem', width:'100%' }}>
+          <button className="icon-btn active" title="Dashboard"><BarChart3 size={20} /></button>
+          {esAdmin && <button className="icon-btn" onClick={() => navigate('/usuarios')} title="Usuarios"><Users size={20} /></button>}
+          <button className="icon-btn" title="Base de datos"><Database size={20} /></button>
         </nav>
-
-        <div className="flex flex-col gap-4">
-          <div className="hidden lg:flex items-center gap-3 p-3 bg-white/5 rounded-2xl border border-white/5 mb-4">
-            <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-bold text-blue-400 border border-white/10 uppercase">
-              {usuario.charAt(0)}
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-bold truncate">{usuario}</p>
-              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{esAdmin ? 'Admin' : 'Analista'}</p>
-            </div>
-          </div>
-          <button onClick={() => { localStorage.clear(); navigate('/login'); }} className="flex items-center gap-4 p-3 text-red-500/60 hover:text-red-500 font-bold">
-            <LogOut size={20} />
-            <span className="hidden lg:block">Cerrar Sesión</span>
-          </button>
-        </div>
+        <button className="icon-btn danger" onClick={() => { localStorage.clear(); navigate('/login'); }} title="Cerrar sesión">
+          <LogOut size={20} />
+        </button>
       </aside>
 
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="h-20 border-b border-white/5 flex items-center justify-between px-10 bg-slate-900/10 backdrop-blur-xl z-10">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 text-slate-400">
-              <Clock size={16} />
-              <span className="text-xs font-black uppercase tracking-widest">
-                {new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </span>
-            </div>
-            <div className="h-4 w-px bg-white/5"></div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Online</span>
+      <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+
+        {/* Header */}
+        <header className="card" style={{
+          margin:'0.75rem 0.75rem 0 0.75rem', borderRadius:'1.5rem',
+          padding:'0.85rem 1.5rem', display:'flex', alignItems:'center',
+          justifyContent:'space-between', gap:'1rem', flexShrink:0,
+        }}>
+          <div>
+            <span className="pill" style={{ display:'inline-flex', marginBottom:'0.35rem' }}>
+              <Activity size={11} /> Panel operativo
+            </span>
+            <h1 style={{ fontFamily:'var(--font-title)', fontSize:'1.5rem', fontWeight:900, letterSpacing:'-0.04em' }}>
+              FinSight <span style={{ color:'var(--blue)' }}>Colombia</span>
+            </h1>
+            <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', marginTop:'0.12rem' }}>
+              <span className="label">{new Date().toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' })}</span>
+              <span className="dot-live" />
             </div>
           </div>
-
-          <div className="flex items-center gap-4">
-            <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
-              <input 
-                type="text" 
-                placeholder="Buscar..."
-                className="bg-slate-900/50 border border-white/5 rounded-2xl py-2.5 pl-12 pr-6 text-sm focus:border-blue-500/50 outline-none w-64 transition-all"
-              />
+          <div style={{ display:'flex', alignItems:'center', gap:'0.65rem' }}>
+            <div style={{ padding:'0.45rem 0.85rem', background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', textAlign:'right' }}>
+              <p style={{ fontSize:'0.68rem', fontWeight:800, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--text-1)' }}>{usuario}</p>
+              <p style={{ fontSize:'0.57rem', fontWeight:700, letterSpacing:'0.2em', textTransform:'uppercase', color:'var(--text-3)', marginTop:'0.1rem' }}>{esAdmin ? 'Administrador' : 'Analista'}</p>
             </div>
-            <button onClick={iniciarScraping} disabled={ejecutandoScraper} className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl transition-all text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-600/20 active:scale-95 disabled:opacity-50">
-              <RefreshCw size={14} className={ejecutandoScraper ? 'animate-spin' : ''} />
-              {ejecutandoScraper ? '...' : 'Sincronizar'}
+            <button className="btn-ghost" onClick={limpiarBD}>Limpiar BD</button>
+            <button className="btn-primary" onClick={iniciarScraping} disabled={scraping} style={{ whiteSpace:'nowrap' }}>
+              <RefreshCw size={14} style={{ animation: scraping ? 'spin 1s linear infinite' : 'none' }} />
+              {scraping ? 'Extrayendo datos…' : 'Extraer datos'}
             </button>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-10 custom-scrollbar">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-10">
-            {predicciones.length > 0 ? predicciones.map((p, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
-                <CardPrediccion 
-                  titulo={p.variable} 
-                  valor={`Tendencia: ${p.prediccion.toUpperCase()}`} 
-                  tendencia={p.prediccion} 
-                  confianza={Math.round(p.confianza * 100)} 
-                  icono={DollarSign} 
-                />
-              </motion.div>
-            )) : (
-              [1,2,3].map(i => (
-                <div key={i} className="glass h-40 animate-pulse bg-white/5 rounded-[2rem]"></div>
-              ))
-            )}
-          </div>
+        {/* Content grid */}
+        <div style={{
+          flex:1, minHeight:0, overflow:'hidden', display:'grid',
+          gridTemplateColumns:'1fr 296px', gap:'0.75rem', padding:'0.75rem',
+        }}>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-            <div className="lg:col-span-2 flex flex-col gap-6">
-              <div className="glass p-10 rounded-[3rem] shadow-2xl relative overflow-hidden flex-1 border-white/10 bg-slate-900/40">
-                <div className="flex justify-between items-center mb-10">
+          <main style={{ overflowY:'auto', display:'flex', flexDirection:'column', gap:'0.75rem' }}>
+
+            {/* 1 ── Terminal de logs (arriba de todo) */}
+            <div className="card" style={{ overflow:'hidden', padding:0, flexShrink:0 }}>
+              {/* Terminal header */}
+              <div style={{
+                display:'flex', alignItems:'center', justifyContent:'space-between',
+                padding:'0.65rem 1.1rem', borderBottom:'1px solid var(--border)',
+                background:'rgba(0,0,0,0.30)',
+              }}>
+                <div style={{ display:'flex', alignItems:'center', gap:'0.5rem' }}>
+                  <Terminal size={13} style={{ color:'var(--blue)' }} />
+                  <span className="label">Registro de extracción</span>
+                </div>
+                {/* Estado del proceso */}
+                {scraping && (
+                  <div style={{ display:'flex', alignItems:'center', gap:'0.45rem' }}>
+                    <motion.span
+                      animate={{ opacity: [1, 0.3, 1] }}
+                      transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+                      style={{ display:'inline-block', width:6, height:6, borderRadius:'50%', background:'var(--amber)' }}
+                    />
+                    <span style={{ fontSize:'0.58rem', fontWeight:800, letterSpacing:'0.18em', textTransform:'uppercase', color:'var(--amber)' }}>Procesando</span>
+                  </div>
+                )}
+                {scraperDone && !scraping && (
+                  <span style={{ display:'flex', alignItems:'center', gap:'0.35rem', color:'var(--green)', fontSize:'0.58rem', fontWeight:800, letterSpacing:'0.18em', textTransform:'uppercase' }}>
+                    <CheckCircle size={11} /> Completado
+                  </span>
+                )}
+              </div>
+
+              {/* Log lines */}
+              <div
+                ref={logsRef}
+                style={{
+                  height: logs.length > 0 ? '210px' : '56px',
+                  overflowY:'auto',
+                  background:'rgba(0,0,0,0.42)',
+                  padding:'0.7rem 1rem',
+                  fontFamily:"'Courier New',monospace",
+                  fontSize:'0.69rem',
+                  display:'flex',
+                  flexDirection:'column',
+                  gap:'0.3rem',
+                  transition:'height 0.35s cubic-bezier(0.4,0,0.2,1)',
+                  scrollbarColor:'rgba(148,163,184,0.15) transparent',
+                }}
+              >
+                {logs.length === 0 ? (
+                  <p style={{ color:'var(--text-3)', fontStyle:'italic', lineHeight:1.5 }}>
+                    {scraping ? 'Conectando con el servidor…' : 'Presiona Sincronizar para iniciar la extracción de datos.'}
+                  </p>
+                ) : (
+                  <AnimatePresence initial={false}>
+                    {logs.map((l, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, x: -16, y: -4 }}
+                        animate={{ opacity: 1, x: 0, y: 0 }}
+                        transition={{ duration: 0.28, ease: 'easeOut' }}
+                        style={{ display:'flex', gap:'0.6rem', alignItems:'flex-start' }}
+                      >
+                        <span style={{ color:'var(--text-3)', minWidth:'60px', flexShrink:0 }}>{l.ts}</span>
+                        <span style={{
+                          color: l.msg.includes('✓') || l.msg.includes('OK') ? '#4ade80'
+                            : l.msg.includes('✗') || l.msg.toLowerCase().includes('error') ? '#f87171'
+                            : l.msg.startsWith('===') ? '#93c5fd'
+                            : 'var(--text-2)',
+                          fontWeight: l.msg.startsWith('===') ? 700 : 400,
+                        }}>
+                          {l.msg}
+                        </span>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                )}
+              </div>
+            </div>
+
+            {/* 2 ── Stats bar */}
+            <div className="card" style={{ padding:'0.8rem' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'0.6rem' }}>
+
+                {/* Noticias cargadas */}
+                <div className="stat-cell">
+                  <p className="stat-cell-label">Noticias cargadas</p>
+                  <p className="stat-cell-value">{noticias.length}</p>
+                  {noticias.length > 0
+                    ? <span className="stat-cell-badge badge-neutral">{[...new Set(noticias.map(n=>n.fuente))].length} fuentes</span>
+                    : <span style={{ fontSize:'0.68rem', color:'var(--text-3)', marginTop:'0.4rem', display:'block' }}>Sin datos aún</span>
+                  }
+                </div>
+
+                {/* Sentimiento */}
+                <div className="stat-cell">
+                  <p className="stat-cell-label">Sentimiento positivo</p>
+                  <p className="stat-cell-value">{noticias.length > 0 ? `${positivePct}%` : '—'}</p>
+                  {noticias.length > 0
+                    ? <span className={`stat-cell-badge ${positivePct >= 50 ? 'badge-green' : 'badge-red'}`}>{noticiasPositivas} positivas</span>
+                    : <span style={{ fontSize:'0.68rem', color:'var(--text-3)', marginTop:'0.4rem', display:'block' }}>Extrae datos primero</span>
+                  }
+                </div>
+
+                {/* TRM */}
+                <div className="stat-cell">
+                  <p className="stat-cell-label">TRM actual</p>
+                  {trmActual
+                    ? <>
+                        <p className="stat-cell-value">${trmActual.toLocaleString('es-CO')}</p>
+                        <span className="stat-cell-badge badge-blue">{ultimaFecha}</span>
+                      </>
+                    : <>
+                        <p style={{ fontSize:'1.4rem', fontWeight:900, color:'var(--text-3)', marginTop:'0.6rem' }}>Sin datos</p>
+                        <button
+                          onClick={seedTRM}
+                          disabled={seedingTRM}
+                          style={{
+                            marginTop:'0.5rem', fontSize:'0.58rem', fontWeight:800, letterSpacing:'0.12em',
+                            textTransform:'uppercase', color:'var(--blue)', background:'var(--blue-dim)',
+                            border:'1px solid var(--blue-border)', borderRadius:'99px', padding:'0.2rem 0.65rem',
+                            cursor:'pointer', opacity: seedingTRM ? 0.6 : 1,
+                          }}
+                        >
+                          {seedingTRM ? 'Cargando…' : '↓ Cargar TRM'}
+                        </button>
+                      </>
+                  }
+                </div>
+
+                {/* Predicciones */}
+                <div className="stat-cell">
+                  <p className="stat-cell-label">Predicciones</p>
+                  <p className="stat-cell-value">{predicciones.length}</p>
+                  {predicciones.length > 0
+                    ? <span className="stat-cell-badge badge-neutral">Modelo activo</span>
+                    : <span style={{ fontSize:'0.68rem', color:'var(--text-3)', marginTop:'0.4rem', display:'block' }}>Genera al scrapear</span>
+                  }
+                </div>
+
+              </div>
+            </div>
+
+            {/* 3 ── Prediction cards */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'0.65rem' }}>
+              {predicciones.length > 0
+                ? predicciones.map((p, i) => (
+                  <motion.div key={i} initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} transition={{ delay: i * 0.1 }}>
+                    <CardPrediccion
+                      titulo={p.variable}
+                      valor={`Tendencia: ${p.prediccion.toUpperCase()}`}
+                      tendencia={p.prediccion}
+                      confianza={Math.round(p.confianza)}
+                      icono={Activity}
+                    />
+                  </motion.div>
+                ))
+                : (
+                  <div style={{ gridColumn:'span 3' }}>
+                    {cargando
+                      ? <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'0.65rem' }}>
+                          {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height:'150px', borderRadius:'1.5rem' }} />)}
+                        </div>
+                      : <EmptyState text="Sin predicciones — extrae datos para generar el modelo" />
+                    }
+                  </div>
+                )
+              }
+            </div>
+
+            {/* 4 ── Análisis del Día */}
+            {(() => {
+              const predTRM = predicciones.find(p => p.variable === 'TRM');
+              if (!predTRM) return null;
+              const confianza = Math.round(predTRM.confianza * 100);
+              const dir = predTRM.prediccion === 'sube' ? 'SUBA' : predTRM.prediccion === 'baja' ? 'BAJE' : 'SE MANTENGA';
+              const color = predTRM.prediccion === 'sube' ? 'var(--green)' : predTRM.prediccion === 'baja' ? 'var(--red)' : 'var(--blue)';
+              const fuentesStr = [...new Set(noticias.map(n => n.fuente))].slice(0,3).join(', ');
+              const hoy = new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
+              return (
+                <motion.div
+                  initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }}
+                  className="card"
+                  style={{
+                    padding:'1.1rem 1.25rem',
+                    borderLeft: `3px solid ${color}`,
+                    display:'flex', gap:'1rem', alignItems:'flex-start',
+                  }}
+                >
+                  <div style={{ flexShrink:0, width:32, height:32, borderRadius:'0.6rem', background: predTRM.prediccion === 'sube' ? 'var(--green-dim)' : 'var(--red-dim)', border:`1px solid ${color}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <ArrowUpRight size={16} style={{ color, transform: predTRM.prediccion === 'baja' ? 'rotate(90deg)' : 'none' }} />
+                  </div>
                   <div>
-                    <h3 className="text-2xl font-black text-white tracking-tighter uppercase">Sentimiento</h3>
-                    <p className="text-slate-500 text-xs font-medium uppercase tracking-widest">Impacto TRM</p>
+                    <p className="label" style={{ marginBottom:'0.35rem' }}>Análisis del día — {hoy}</p>
+                    <p style={{ fontSize:'0.82rem', lineHeight:1.7, color:'var(--text-2)' }}>
+                      Con base en el análisis de{' '}
+                      <strong style={{ color:'var(--text-1)' }}>{noticias.length} noticias</strong>{' '}
+                      {fuentesStr ? `de fuentes como ${fuentesStr},` : ''}{' '}
+                      junto con el histórico de los últimos{' '}
+                      <strong style={{ color:'var(--text-1)' }}>{mercadoHistorico.length} días</strong>{' '}
+                      del mercado, el modelo estima una probabilidad del{' '}
+                      <strong style={{ color }}>{confianza}%</strong>{' '}de que la TRM{' '}
+                      <strong style={{ color }}>{dir}</strong>{' '}en la próxima jornada.
+                    </p>
+                  </div>
+                </motion.div>
+              );
+            })()}
+
+            {/* 5 ── Sentimiento de Mercado (neon line) */}
+            {historialSentimiento.length > 0 && (() => {
+              const asc = [...historialSentimiento].reverse();
+              const sentData = {
+                labels: asc.map(s => new Date(s.fecha).toLocaleDateString('es-CO', { day:'numeric', month:'short' })),
+                datasets: [{
+                  label: 'Índice de sentimiento',
+                  data: asc.map(s => s.indice ?? s.valor ?? 0),
+                  borderColor: '#06b6d4',
+                  borderWidth: 2.5,
+                  backgroundColor: ctx => {
+                    const { ctx: c, chartArea } = ctx.chart;
+                    if (!chartArea) return 'transparent';
+                    const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                    g.addColorStop(0, 'rgba(6,182,212,0.22)');
+                    g.addColorStop(1, 'rgba(6,182,212,0)');
+                    return g;
+                  },
+                  fill: true, tension: 0.5, pointRadius: 0, pointHoverRadius: 5,
+                  pointHoverBackgroundColor: '#06b6d4',
+                }],
+              };
+              const sentOpts = {
+                ...chartOpts,
+                scales: {
+                  y: { grid: { color:'rgba(6,182,212,0.07)' }, ticks: { color:'#475569', font:{ size:10 } }, border:{ display:false } },
+                  x: { grid: { display:false }, ticks: { color:'#475569', font:{ size:10 } }, border:{ display:false } },
+                },
+              };
+              return (
+                <div className="card" style={{ padding:'1.1rem 1.25rem', flexShrink:0 }}>
+                  <div style={{ marginBottom:'0.75rem' }}>
+                    <h3 style={{ fontFamily:'var(--font-title)', fontSize:'1rem', fontWeight:900, letterSpacing:'-0.03em', color:'#06b6d4' }}>Sentimiento de Mercado</h3>
+                    <p style={{ color:'var(--text-3)', fontSize:'0.7rem', textTransform:'uppercase', letterSpacing:'0.18em', fontWeight:700, marginTop:'0.15rem' }}>Impacto mediático · TRM</p>
+                  </div>
+                  <div style={{ width:'100%', height:'180px', position:'relative' }}>
+                    <Line data={sentData} options={sentOpts} />
                   </div>
                 </div>
-                <div style={{ height: '400px' }}>
-                  <Line data={chartData} options={chartOptions} />
+              );
+            })()}
+
+            {/* 6 ── TRM Projection Chart */}
+            <div className="card" style={{ padding:'1.25rem', position:'relative', overflow:'visible', flexShrink:0 }}>
+              <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:'1rem', gap:'1rem' }}>
+                <div>
+                  <h3 style={{ fontFamily:'var(--font-title)', fontSize:'1.15rem', fontWeight:900, letterSpacing:'-0.03em', display:'flex', alignItems:'center', gap:'0.4rem' }}>
+                    Motor de proyección TRM <ArrowUpRight size={17} style={{ color:'var(--blue)' }} />
+                  </h3>
+                  <p style={{ color:'var(--text-2)', fontSize:'0.76rem', marginTop:'0.2rem' }}>
+                    Pronóstico basado en análisis de sentimiento multi-fuente
+                  </p>
                 </div>
+                {trmActual && (
+                  <div style={{ flexShrink:0, padding:'0.55rem 0.9rem', background:'var(--blue-dim)', border:'1px solid var(--blue-border)', borderRadius:'var(--radius-md)', textAlign:'right' }}>
+                    <p className="label" style={{ color:'var(--blue)' }}>Sentimiento</p>
+                    <p style={{ fontFamily:'var(--font-title)', fontSize:'0.95rem', fontWeight:900, marginTop:'0.15rem' }}>{positivePct}% positivo</p>
+                  </div>
+                )}
+              </div>
+              <div style={{ width:'100%', height:'210px', position:'relative' }}>
+                {trmChartData
+                  ? <Line data={trmChartData} options={chartOpts} />
+                  : cargando
+                    ? <div className="skeleton" style={{ width:'100%', height:'100%', borderRadius:'var(--radius-md)' }} />
+                    : <EmptyState text="Sin datos TRM históricos. Extrae datos para ver la proyección." />
+                }
               </div>
             </div>
 
-            <div className="glass p-8 rounded-[3rem] shadow-2xl flex flex-col border-white/10 bg-slate-900/40 h-[650px]">
-              <div className="flex p-1.5 bg-slate-950 rounded-3xl mb-8 border border-white/5 shadow-inner">
-                <button 
-                  onClick={() => setTabSeleccionada('noticias')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${tabSeleccionada === 'noticias' ? 'bg-slate-800 text-blue-400 shadow-xl border border-white/5' : 'text-slate-500'}`}
-                >
-                  <Newspaper size={16} /> Noticias
-                </button>
-                <button 
-                  onClick={() => setTabSeleccionada('mercado')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${tabSeleccionada === 'mercado' ? 'bg-slate-800 text-blue-400 shadow-xl border border-white/5' : 'text-slate-500'}`}
-                >
-                  <Activity size={16} /> Mercado
-                </button>
-              </div>
+          </main>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                <AnimatePresence mode="wait">
-                  {tabSeleccionada === 'noticias' ? (
-                    <motion.div key="noticias" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-                      <div className="flex flex-wrap gap-2 mb-6 p-1 bg-slate-950/50 rounded-2xl border border-white/5">
-                        {fuentes.slice(0, 4).map(f => (
-                          <button key={f} onClick={() => setFuenteSeleccionada(f)} className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${fuenteSeleccionada === f ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500'}`}>
-                            {f}
-                          </button>
-                        ))}
-                      </div>
-                      
-                      {noticiasFiltradas.map((n, i) => (
-                        <div key={i} className="group relative p-4 bg-white/[0.02] hover:bg-white/[0.05] rounded-[2rem] border border-white/5 transition-all cursor-pointer" onClick={() => window.open(n.url, '_blank')}>
-                          <div className="flex justify-between items-center mb-3">
-                            <span className="text-[9px] font-black text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full uppercase tracking-widest">{n.fuente}</span>
-                            <span className="text-[9px] font-bold text-slate-600">{new Date(n.fecha).toLocaleDateString()}</span>
-                          </div>
-                          <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors leading-relaxed line-clamp-2 mb-3">{n.titulo}</p>
-                          <div className="flex items-center gap-2 text-[9px] font-black text-blue-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
-                            Ver más <ArrowUpRight size={14} />
-                          </div>
-                        </div>
-                      ))}
-                    </motion.div>
-                  ) : (
-                    <motion.div key="mercado" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-                      <div className="p-6 bg-blue-600/10 rounded-[2rem] border border-blue-500/20 mb-6">
-                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-4">Monitor TRM</p>
-                        <h4 className="text-3xl font-black text-white tracking-tighter">${mercadoHistorico[0]?.valor.toLocaleString() || '3,850'}</h4>
-                      </div>
-
-                      {mercadoHistorico.map((m, i) => (
-                        <div key={i} className="flex justify-between items-center p-4 bg-slate-900/40 rounded-2xl border border-white/5">
-                          <div className="flex items-center gap-4">
-                            <Database size={18} className="text-slate-500" />
-                            <div>
-                              <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{new Date(m.fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}</p>
-                              <p className="text-sm font-bold text-slate-300">${m.valor.toLocaleString()}</p>
-                            </div>
-                          </div>
-                          <ChevronRight size={16} className="text-slate-800" />
-                        </div>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+          <aside style={{
+            display:'flex', flexDirection:'column', overflow:'hidden',
+            background:'var(--bg-sidebar)', border:'1px solid var(--border)',
+            borderRadius:'1.5rem', backdropFilter:'var(--blur)',
+          }}>
+            {/* Tabs + filters */}
+            <div style={{ padding:'0.85rem 0.85rem 0 0.85rem', flexShrink:0 }}>
+              <div className="tab-group" style={{ marginBottom:'0.65rem' }}>
+                {['noticias','mercado'].map(t => (
+                  <button key={t} onClick={() => setTabActiva(t)} className={`tab-btn${tabActiva === t ? ' active' : ''}`}>
+                    {t === 'noticias' ? 'Noticias' : 'Mercado'}
+                  </button>
+                ))}
               </div>
+              {tabActiva === 'noticias' && (
+                <div style={{ display:'flex', flexWrap:'wrap', gap:'0.35rem', paddingBottom:'0.65rem' }}>
+                  {fuentes.map(f => (
+                    <button key={f} onClick={() => setFuenteSeleccionada(f)} className={`chip${fuenteSeleccionada === f ? ' active' : ''}`}>{f}</button>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
+
+            {/* Scrollable list */}
+            <div style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0.35rem 0.85rem 0.85rem' }}>
+              {tabActiva === 'noticias' ? (
+                <div style={{ display:'flex', flexDirection:'column', gap:'0.45rem' }}>
+                  {noticiasFiltradas.length > 0
+                    ? noticiasFiltradas.map((n, i) => (
+                      /* News card with clear "click" affordance */
+                      <motion.div
+                        key={i}
+                        whileHover={{ x: 3 }}
+                        transition={{ duration: 0.18 }}
+                        className="news-card"
+                        onClick={() => n.url && window.open(n.url, '_blank')}
+                        style={{ cursor: n.url ? 'pointer' : 'default' }}
+                      >
+                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                          <span className="news-source">{n.fuente}</span>
+                          <span className={n.sentimiento === 'POS' ? 'sent-pos' : n.sentimiento === 'NEG' ? 'sent-neg' : 'sent-neu'} />
+                        </div>
+                        <p className="news-title">{n.titulo}</p>
+                        {/* Clickable affordance — only if URL exists */}
+                        {n.url && (
+                          <div style={{
+                            display:'flex', alignItems:'center', gap:'0.3rem', marginTop:'0.15rem',
+                            fontSize:'0.58rem', fontWeight:700, letterSpacing:'0.12em', textTransform:'uppercase',
+                            color:'var(--blue)', opacity:0.75,
+                          }}>
+                            <ExternalLink size={10} /> Ver noticia
+                          </div>
+                        )}
+                      </motion.div>
+                    ))
+                    : <EmptyState text={cargando ? 'Cargando…' : 'Sin noticias. Presiona Sincronizar.'} />
+                  }
+                </div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:'0.45rem' }}>
+                  {mercadoHistorico.length > 0
+                    ? mercadoHistorico.map((m, i) => (
+                      <div key={i} className="market-row">
+                        <div style={{ display:'flex', alignItems:'center', gap:'0.7rem' }}>
+                          <div style={{
+                            width:'2.3rem', height:'2.3rem', borderRadius:'0.65rem',
+                            background:'var(--blue-dim)', border:'1px solid var(--blue-border)',
+                            display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', flexShrink:0,
+                          }}>
+                            <span style={{ color:'var(--blue)', fontSize:'0.82rem', fontWeight:900, lineHeight:1 }}>{new Date(m.fecha).getDate()}</span>
+                            <span className="label" style={{ fontSize:'0.48rem' }}>{new Date(m.fecha).toLocaleDateString('es-CO',{month:'short'})}</span>
+                          </div>
+                          <span style={{ fontSize:'0.83rem', fontWeight:700, color:'var(--text-1)' }}>
+                            ${m.valor.toLocaleString('es-CO')}
+                          </span>
+                        </div>
+                        <TrendingUp size={13} style={{ color:'var(--text-3)' }} />
+                      </div>
+                    ))
+                    : <EmptyState text={cargando ? 'Cargando…' : 'Sin datos de mercado.'} />
+                  }
+                </div>
+              )}
+            </div>
+          </aside>
+
         </div>
-      </main>
+      </div>
     </div>
   );
-};
-
-export default DashboardPage;
-
-export default DashboardPage;
+}

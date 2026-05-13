@@ -1,7 +1,6 @@
-import asyncio
-from playwright.async_api import async_playwright
 from extraccion.scraper_base import RaspadorBase
 from db import guardar_noticia
+from nlp import analizar_noticia, clasificar_tema
 from datetime import datetime
 
 class RaspadorElTiempo(RaspadorBase):
@@ -12,26 +11,46 @@ class RaspadorElTiempo(RaspadorBase):
             "https://www.eltiempo.com/economia"
         ]
 
-    async def extraer_noticias(self):
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            
-            for url in self.urls_objetivo:
-                page = await self.obtener_pagina(browser, url)
-                
-                # Selector para El Tiempo (Actualizado 2026)
-                articulos = await page.query_selector_all(".c-articulo__titulo__txt")
-                
-                for art in articulos[:10]:
+    def extraer_noticias(self):
+        for url in self.urls_objetivo:
+            try:
+                soup = self.obtener_html(url)
+
+                # El Tiempo usa <h3> con enlaces para artículos
+                articulos = soup.select("h3 a[href]")
+
+                if not articulos:
+                    articulos = [
+                        a for a in soup.find_all("a", href=True)
+                        if "/economia/" in a["href"] and a.get_text(strip=True)
+                    ]
+
+                urls_vistos = set()
+                count = 0
+                for art in articulos:
+                    if count >= 10:
+                        break
                     try:
-                        titulo = (await art.inner_text()).strip()
-                        enlace = await art.get_attribute("href")
-                        
-                        if enlace and enlace.startswith("/"):
-                            enlace = f"https://www.eltiempo.com{enlace}"
-                        
-                        if not titulo or not enlace:
+                        titulo = art.get_text(strip=True)
+                        enlace = art.get("href", "")
+
+                        if not titulo or len(titulo) < 15:
                             continue
+
+                        if enlace.startswith("/"):
+                            enlace = f"https://www.eltiempo.com{enlace}"
+
+                        # Filtrar enlaces que no sean de economía
+                        if "/economia/" not in enlace and "/mas-contenido/" not in enlace:
+                            continue
+
+                        if enlace in urls_vistos:
+                            continue
+                        urls_vistos.add(enlace)
+
+                        sentimiento, puntaje = analizar_noticia(titulo)
+                        tema = clasificar_tema(titulo)
+                        mapeo_sent = {'positivo': 'POS', 'negativo': 'NEG', 'neutro': 'NEU'}
 
                         noticia = {
                             "fuente": self.fuente,
@@ -40,21 +59,23 @@ class RaspadorElTiempo(RaspadorBase):
                             "resumen": "",
                             "fecha": datetime.now().date(),
                             "categoria": "Economía",
-                            "sentimiento": None,
-                            "puntaje": None,
-                            "tema": "General" 
+                            "sentimiento": mapeo_sent.get(sentimiento, 'NEU'),
+                            "puntaje": round(puntaje, 4),
+                            "tema": tema
                         }
-                        
+
                         guardar_noticia(noticia)
-                        print(f"[{self.fuente}] Capturada: {titulo[:50]}...")
-                            
+                        count += 1
+                        print(f"  [{self.fuente}] OK: {titulo[:60]}...")
+
                     except Exception as e:
-                        print(f"Error procesando artículo en {self.fuente}: {e}")
-                
-                await page.close()
-            
-            await browser.close()
+                        print(f"  Error procesando artículo en {self.fuente}: {e}")
+
+                print(f"  {self.fuente} desde {url}: {count} noticias")
+
+            except Exception as e:
+                print(f"  ✗ Error descargando {url}: {e}")
 
 if __name__ == "__main__":
     raspador = RaspadorElTiempo()
-    asyncio.run(raspador.extraer_noticias())
+    raspador.extraer_noticias()

@@ -1,134 +1,247 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, ChevronRight, AlertCircle, Zap, ShieldCheck } from 'lucide-react';
+import { Lock, Mail, AlertCircle, ShieldCheck, Zap, ArrowRight, Activity, Globe2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const LoginPage = () => {
-  const [email, setEmail] = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [error, setError]       = useState('');
+  const [loading, setLoading]   = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
-    const formData = new URLSearchParams();
-    formData.append('username', email);
-    formData.append('password', password);
-
+    const form = new URLSearchParams();
+    form.append('username', email);
+    form.append('password', password);
     try {
       const res = await fetch('http://127.0.0.1:8000/auth/login', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json'
-        },
-        body: formData
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+        body: form,
       });
-      
       if (res.ok) {
         const data = await res.json();
         localStorage.setItem('token', data.access_token);
         localStorage.setItem('user', data.nombre);
         localStorage.setItem('rol', data.rol);
-        navigate('/lanzamiento');
+        navigate('/dashboard');
       } else {
-        const errData = await res.json();
-        setError(errData.detail || 'Credenciales inválidas');
+        const err = await res.json();
+        setError(err.detail || 'Acceso denegado');
       }
-    } catch (err) {
-      setError('Error de conexión. Verifica que el backend esté activo.');
+    } catch {
+      setError('Sin conexión al servidor');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-6 relative overflow-hidden">
-      <div className="absolute top-1/4 -left-20 w-96 h-96 bg-blue-600/20 rounded-full blur-[120px] animate-pulse" />
-      <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] animate-pulse duration-700" />
+    <div className="app-shell" style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '2rem 1.25rem',
+    }}>
+      <div style={{ width: '100%', maxWidth: '1080px' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+          gap: '1.25rem',
+          alignItems: 'stretch',
+        }}>
 
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="glass p-12 w-full max-w-lg shadow-2xl relative z-10 border-white/10"
-      >
-        <div className="text-center mb-10">
-          <motion.div 
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            className="inline-flex p-4 bg-blue-600 rounded-3xl shadow-xl shadow-blue-500/20 mb-6"
-          >
-            <Zap className="text-white fill-white" size={32} />
-          </motion.div>
-          <h1 className="text-4xl font-black text-white tracking-tighter mb-2">
-            FinSight<span className="text-blue-500">Colombia</span>
-          </h1>
-          <p className="text-slate-400 font-medium tracking-tight">Acceso Seguro al Terminal de Inteligencia</p>
-        </div>
-
-        {error && (
-          <motion.div 
-            initial={{ opacity: 0, x: -10 }}
+          {/* ── Left panel: branding ── */}
+          <motion.section
+            initial={{ opacity: 0, x: -24 }}
             animate={{ opacity: 1, x: 0 }}
-            className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl mb-8 flex items-center gap-3 text-sm font-bold"
+            transition={{ duration: 0.5 }}
+            className="card-solid soft-grid"
+            style={{
+              position: 'relative',
+              overflow: 'hidden',
+              padding: '2.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              minHeight: '520px',
+            }}
           >
-            <AlertCircle size={20} /> {error}
-          </motion.div>
-        )}
+            {/* Glow orb */}
+            <div style={{
+              position: 'absolute', top: '-60px', right: '-60px',
+              width: '280px', height: '280px', borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(79,140,255,0.18), transparent 70%)',
+              pointerEvents: 'none',
+            }} />
+            <div style={{
+              position: 'absolute', bottom: '-40px', left: '-40px',
+              width: '200px', height: '200px', borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(34,197,94,0.08), transparent 70%)',
+              pointerEvents: 'none',
+            }} />
 
-        <form onSubmit={handleLogin} className="flex flex-col gap-6">
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-2">Email Corporativo</label>
-            <div className="relative group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors" size={20} />
-              <input 
-                type="email" 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-900/50 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10 transition-all font-medium"
-                placeholder="usuario@finsight.com"
-                required
-              />
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <span className="pill"><Activity size={11} /> Market Intelligence Suite</span>
+
+              <div style={{ marginTop: '2.5rem' }}>
+                <div className="logo-icon" style={{ width: '3.5rem', height: '3.5rem', borderRadius: '1rem' }}>
+                  <Zap size={28} fill="currentColor" />
+                </div>
+                <h1 style={{
+                  fontFamily: 'var(--font-title)',
+                  fontSize: 'clamp(2.2rem, 4vw, 3.5rem)',
+                  fontWeight: 900,
+                  letterSpacing: '-0.04em',
+                  lineHeight: 0.95,
+                  marginTop: '1.5rem',
+                  color: 'var(--text-1)',
+                }}>
+                  FinSight <span style={{ color: 'var(--blue)' }}>Colombia</span>
+                </h1>
+                <p style={{
+                  marginTop: '1rem',
+                  fontSize: '0.875rem',
+                  lineHeight: 1.8,
+                  color: 'var(--text-2)',
+                  maxWidth: '380px',
+                }}>
+                  Observa noticias, sentimiento y proyecciones TRM en una sola consola. Jerarquía visual clara, datos en tiempo real.
+                </p>
+              </div>
+
+              {/* Feature mini-cards */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '0.75rem',
+                marginTop: '2rem',
+              }}>
+                {[
+                  { icon: <Activity size={16} />, label: 'Señales', sub: 'Noticias & mercado', color: 'var(--blue)' },
+                  { icon: <Globe2 size={16} />, label: 'Cobertura', sub: 'Medios locales', color: 'var(--green)' },
+                  { icon: <ShieldCheck size={16} />, label: 'Control', sub: 'Acceso seguro', color: 'var(--amber)' },
+                ].map(({ icon, label, sub, color }) => (
+                  <div key={label} style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '0.85rem',
+                  }}>
+                    <span style={{ color }}>{icon}</span>
+                    <p className="label" style={{ marginTop: '0.65rem' }}>{label}</p>
+                    <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-1)' }}>{sub}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-2">Contraseña</label>
-            <div className="relative group">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors" size={20} />
-              <input 
-                type="password" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-900/50 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10 transition-all font-medium"
-                placeholder="••••••••"
-                required
-              />
+            {/* Bottom tags */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '1.5rem', position: 'relative', zIndex: 1 }}>
+              {['TRM Forecasting', 'Sentiment Engine', 'Live Scraper'].map(t => (
+                <span key={t} className="pill">{t}</span>
+              ))}
             </div>
-          </div>
+          </motion.section>
 
-          <button 
-            type="submit"
-            disabled={loading}
-            className="relative mt-4 group overflow-hidden bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl transition-all shadow-xl shadow-blue-600/20 active:scale-[0.98] disabled:opacity-50"
+          {/* ── Right panel: login form ── */}
+          <motion.section
+            initial={{ opacity: 0, x: 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.08 }}
+            className="card"
+            style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}
           >
-            <div className="flex items-center justify-center gap-2 relative z-10">
-              {loading ? 'AUTENTICANDO...' : 'ACCEDER AL TERMINAL'} 
-              {!loading && <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />}
+            <div style={{ marginBottom: '2rem' }}>
+              <span className="pill"><ShieldCheck size={11} /> Acceso privado</span>
+              <h2 style={{
+                fontFamily: 'var(--font-title)',
+                fontSize: '1.85rem',
+                fontWeight: 900,
+                letterSpacing: '-0.04em',
+                marginTop: '1.25rem',
+              }}>
+                Entrar al panel
+              </h2>
+              <p style={{ marginTop: '0.6rem', fontSize: '0.85rem', lineHeight: 1.7, color: 'var(--text-2)' }}>
+                Usa tu correo corporativo para acceder al dashboard de análisis.
+              </p>
             </div>
-          </button>
-        </form>
 
-        <div className="mt-10 flex items-center justify-center gap-2 text-slate-500">
-          <ShieldCheck size={16} className="text-blue-500/50" />
-          <p className="text-[10px] font-black uppercase tracking-widest">Encriptación de Grado Bancario Activa</p>
+            {error && (
+              <div className="alert-error" style={{ marginBottom: '1.25rem' }}>
+                <AlertCircle size={16} /> {error}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+              {/* Email */}
+              <div>
+                <label className="label" style={{ display: 'block', marginBottom: '0.5rem' }}>Correo</label>
+                <div className="relative">
+                  <Mail size={16} className="input-icon" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    className="fs-input"
+                    placeholder="analista@finsight.com"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="label" style={{ display: 'block', marginBottom: '0.5rem' }}>Contraseña</label>
+                <div className="relative">
+                  <Lock size={16} className="input-icon" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="fs-input"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary"
+                style={{ marginTop: '0.5rem', width: '100%', padding: '1rem' }}
+              >
+                {loading ? 'Validando acceso…' : 'Entrar al dashboard'}
+                {!loading && <ArrowRight size={17} />}
+              </button>
+            </form>
+
+            {/* Footer badge */}
+            <div style={{
+              marginTop: '2rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.75rem 1rem',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+            }}>
+              <span className="label">Entorno seguro</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--green)', fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+                <ShieldCheck size={13} /> Enterprise
+              </span>
+            </div>
+          </motion.section>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 };

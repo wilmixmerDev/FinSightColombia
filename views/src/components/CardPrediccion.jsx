@@ -3,60 +3,86 @@ import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus, ShieldCheck } from 'lucide-react';
 
 const CardPrediccion = ({ titulo, valor, tendencia, confianza, icono: Icono }) => {
-  const esAlza = tendencia === 'sube';
-  const esBaja = tendencia === 'baja';
+  const isUp   = tendencia === 'sube';
+  const isDown = tendencia === 'baja';
+
+  const accent = isUp
+    ? { text: 'var(--green)', bg: 'var(--green-dim)', border: 'var(--green-border)', bar: '#22c55e' }
+    : isDown
+    ? { text: 'var(--red)',   bg: 'var(--red-dim)',   border: 'var(--red-border)',   bar: '#ef4444' }
+    : { text: 'var(--blue)',  bg: 'var(--blue-dim)',  border: 'var(--blue-border)',  bar: '#4f8cff' };
 
   return (
-    <motion.div 
-      whileHover={{ y: -5 }}
-      className="glass p-8 flex flex-col gap-6 relative overflow-hidden group shadow-2xl"
-    >
-      <div className={`absolute -right-10 -top-10 w-40 h-40 rounded-full blur-[80px] opacity-20 transition-all group-hover:opacity-40 ${
-        esAlza ? 'bg-green-500' : esBaja ? 'bg-red-500' : 'bg-blue-500'
-      }`} />
-
-      <div className="flex justify-between items-start relative z-10">
+    <div className="pred-card">
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <div>
-          <p className="text-slate-400 text-xs font-black uppercase tracking-widest mb-1">{titulo}</p>
-          <h2 className="text-2xl font-black text-white tracking-tight leading-tight">{valor}</h2>
+          <p className="label">{titulo}</p>
+          <p style={{
+            fontFamily: 'var(--font-title)',
+            fontSize: '1.05rem',
+            fontWeight: 800,
+            color: 'var(--text-1)',
+            marginTop: '0.3rem',
+            lineHeight: 1.2,
+          }}>
+            {valor}
+          </p>
         </div>
-        <div className="p-3 bg-slate-900/50 rounded-2xl border border-white/5 shadow-inner">
-          <Icono size={24} className="text-blue-400" />
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: '2.5rem', height: '2.5rem',
+          borderRadius: 'var(--radius-sm)',
+          background: accent.bg,
+          border: `1px solid ${accent.border}`,
+        }}>
+          <Icono size={18} style={{ color: accent.text }} />
         </div>
       </div>
 
-      <div className="flex items-center gap-3 relative z-10">
-        <div className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg ${
-          esAlza ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 
-          esBaja ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 
-          'bg-slate-500/10 text-slate-400 border border-slate-500/20'
-        }`}>
-          {esAlza && <TrendingUp size={14} />}
-          {esBaja && <TrendingDown size={14} />}
-          {!esAlza && !esBaja && <Minus size={14} />}
-          <span>{tendencia}</span>
-        </div>
+      {/* Trend badge */}
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+        padding: '0.25rem 0.65rem',
+        borderRadius: '99px',
+        background: accent.bg,
+        border: `1px solid ${accent.border}`,
+        color: accent.text,
+        fontSize: '0.6rem',
+        fontWeight: 800,
+        letterSpacing: '0.2em',
+        textTransform: 'uppercase',
+      }}>
+        {isUp   && <TrendingUp  size={11} />}
+        {isDown && <TrendingDown size={11} />}
+        {!isUp && !isDown && <Minus size={11} />}
+        {tendencia}
       </div>
 
-      <div className="mt-2 relative z-10">
-        <div className="flex justify-between items-center text-[10px] text-slate-400 mb-2 uppercase font-black tracking-widest">
-          <span className="flex items-center gap-1">
-            <ShieldCheck size={12} className="text-blue-500" /> Confianza I.A.
+      {/* Confidence bar */}
+      <div style={{ marginTop: '1.25rem' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.2em',
+          textTransform: 'uppercase', color: 'var(--text-3)',
+          marginBottom: '0.5rem',
+        }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <ShieldCheck size={10} style={{ color: 'var(--blue)' }} /> Confianza
           </span>
-          <span className="text-white bg-blue-500/20 px-2 py-0.5 rounded-md">{confianza}%</span>
+          <span style={{ color: 'var(--text-1)' }}>{confianza}%</span>
         </div>
-        <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden border border-white/5 p-[1px]">
-          <motion.div 
+        <div className="progress-track">
+          <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${confianza}%` }}
-            transition={{ duration: 1.5, ease: "easeOut" }}
-            className={`h-full rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)] ${
-              esAlza ? 'bg-green-500' : esBaja ? 'bg-red-500' : 'bg-blue-500'
-            }`}
+            transition={{ duration: 1, ease: 'easeOut' }}
+            className="progress-fill"
+            style={{ background: accent.bar }}
           />
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 

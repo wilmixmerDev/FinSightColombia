@@ -1,7 +1,6 @@
-import asyncio
+import requests
 import random
-from playwright.async_api import async_playwright
-from playwright_stealth import stealth_async
+from bs4 import BeautifulSoup
 
 class RaspadorBase:
     def __init__(self):
@@ -11,24 +10,24 @@ class RaspadorBase:
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0"
         ]
+        self.session = requests.Session()
 
-    async def obtener_pagina(self, browser, url):
-        """Crea una nueva página con stealth y un User-Agent aleatorio."""
+    def obtener_html(self, url, timeout=30):
+        """Obtiene el HTML de una URL usando requests (sin navegador)."""
         ua = random.choice(self.user_agents)
-        context = await browser.new_context(user_agent=ua)
-        page = await context.new_page()
-        
-        # Aplicamos modo sigiloso
-        await stealth_async(page)
-        
-        print(f"Navegando a: {url}")
-        await page.goto(url, wait_until="domcontentloaded", timeout=60000)
-        
-        # Pausa aleatoria para imitar humano
-        await asyncio.sleep(random.uniform(2, 5))
-        
-        return page
+        headers = {
+            "User-Agent": ua,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "es-CO,es;q=0.9,en;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+        }
+        print(f"Descargando: {url}")
+        response = self.session.get(url, headers=headers, timeout=timeout)
+        response.raise_for_status()
+        return BeautifulSoup(response.text, "html.parser")
 
-    async def extraer_noticias(self):
+    def extraer_noticias(self):
         """Método que debe ser implementado por cada raspador específico."""
-        raise NotImplementedError("Cada raspador debe implementar su propia lógica de extracción")
+        pass
