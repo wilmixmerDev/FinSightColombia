@@ -1,11 +1,28 @@
 import threading
 from fastapi import APIRouter
 from seed_trm import obtener_trm_banrep, generar_trm_aproximada
-from extraccion.portafolio import RaspadorPortafolio
-from extraccion.larepublica import RaspadorLaRepublica
-from extraccion.eltiempo import RaspadorElTiempo
-from extraccion.semana import RaspadorSemana
-from extraccion.dinero import RaspadorDinero
+
+# Intento robusto de importación del paquete `extraccion`.
+# Si la aplicación se inicia desde un subdirectorio (p.ej. `api/`),
+# Python puede no tener la raíz del proyecto en `sys.path` y fallar
+# con `ModuleNotFoundError: No module named 'extraccion'`.
+try:
+    from extraccion.portafolio import RaspadorPortafolio
+    from extraccion.larepublica import RaspadorLaRepublica
+    from extraccion.eltiempo import RaspadorElTiempo
+    from extraccion.semana import RaspadorSemana
+    from extraccion.dinero import RaspadorDinero
+except Exception:
+    import sys, os
+    # Añadir la raíz del proyecto al PYTHONPATH (tres niveles desde este archivo)
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    from extraccion.portafolio import RaspadorPortafolio
+    from extraccion.larepublica import RaspadorLaRepublica
+    from extraccion.eltiempo import RaspadorElTiempo
+    from extraccion.semana import RaspadorSemana
+    from extraccion.dinero import RaspadorDinero
 from indices import calcular_indice_diario
 from modelo import ModeloMercado
 from db import ejecutar_consulta

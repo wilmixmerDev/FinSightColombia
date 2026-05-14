@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { UserPlus, Mail, Lock, ChevronLeft, User, Shield, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import logoImg from '../assets/FINSIGHT.png';
 
 export default function UserManagement() {
   const [nombre,   setNombre]   = useState('');
@@ -65,8 +66,8 @@ export default function UserManagement() {
             marginBottom: '2rem',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div className="logo-icon" style={{ width: '3rem', height: '3rem', borderRadius: '0.85rem' }}>
-                <UserPlus size={20} />
+              <div className="logo-mark logo-mark--compact" style={{ overflow:'hidden' }}>
+                <img src={logoImg} alt="FinSight logo" />
               </div>
               <div>
                 <span className="pill" style={{ display: 'inline-flex', marginBottom: '0.5rem' }}>

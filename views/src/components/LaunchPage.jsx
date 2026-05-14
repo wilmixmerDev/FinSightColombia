@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Activity, CheckCircle, Terminal, ShieldCheck, Sparkles, ArrowRight } from 'lucide-react';
+import { Play, CheckCircle, Terminal, ShieldCheck, Sparkles, ArrowRight } from 'lucide-react';
+import logoImg from '../assets/FINSIGHT.png';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function LaunchPage() {
@@ -55,8 +56,8 @@ export default function LaunchPage() {
               <Sparkles size={11} /> Orquestación de datos
             </span>
 
-            <div className="logo-icon" style={{ width: '3.5rem', height: '3.5rem', borderRadius: '1rem' }}>
-              <Activity size={28} />
+            <div className="logo-mark logo-mark--hero" style={{ overflow:'hidden' }}>
+              <img src={logoImg} alt="FinSight logo" />
             </div>
 
             <h1 style={{

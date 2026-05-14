@@ -5,6 +5,7 @@ import {
   LogOut, Terminal, CheckCircle, ArrowUpRight, TrendingUp,
   Inbox, ExternalLink,
 } from 'lucide-react';
+import logoImg from '../assets/FINSIGHT.png';
 import { Line } from 'react-chartjs-2';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,6 +21,7 @@ const now = () => new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minu
 
 export default function DashboardPage() {
   const [noticias,            setNoticias]            = useState([]);
+  const [limitNoticias,      setLimitNoticias]      = useState(30);
   const [predicciones,        setPredicciones]        = useState([]);
   const [mercadoHistorico,    setMercadoHistorico]    = useState([]);
   const [historialSentimiento,setHistorialSentimiento]= useState([]);
@@ -47,7 +49,7 @@ export default function DashboardPage() {
   const cargarDatos = async () => {
     try {
       const [r1, r2, r3, r4] = await Promise.all([
-        fetch(`${API}/noticias/?limit=30`).then(r => r.json()).catch(() => []),
+        fetch(`${API}/noticias/?limit=${limitNoticias}`).then(r => r.json()).catch(() => []),
         fetch(`${API}/prediccion/actual`).then(r => r.json()).catch(() => []),
         fetch(`${API}/mercado/historico?variable=TRM&limit=15`).then(r => r.json()).catch(() => []),
         fetch(`${API}/noticias/sentimiento-historial?tema=TRM`).then(r => r.json()).catch(() => []),
@@ -98,7 +100,7 @@ export default function DashboardPage() {
     setMercadoHistorico(Array.isArray(r) ? r : []);
   };
 
-  useEffect(() => { cargarDatos(); }, []);
+  useEffect(() => { cargarDatos(); }, [limitNoticias]);
   useEffect(() => {
     if (logsRef.current) logsRef.current.scrollTop = logsRef.current.scrollHeight;
   }, [logs]);
@@ -218,11 +220,14 @@ export default function DashboardPage() {
         background:'var(--bg-sidebar)', border:'1px solid var(--border)', borderRadius:'1.5rem',
         backdropFilter:'var(--blur)',
       }}>
-        <div className="logo-icon" style={{ marginBottom:'0.5rem' }}><Zap size={20} fill="currentColor" /></div>
+        <div className="logo-mark logo-mark--sidebar" style={{ marginBottom:'0.5rem', overflow:'hidden' }}>
+          <img src={logoImg} alt="FinSight logo" />
+        </div>
         <nav style={{ flex:1, display:'flex', flexDirection:'column', gap:'0.4rem', width:'100%' }}>
           <button className="icon-btn active" title="Dashboard"><BarChart3 size={20} /></button>
           {esAdmin && <button className="icon-btn" onClick={() => navigate('/usuarios')} title="Usuarios"><Users size={20} /></button>}
-          <button className="icon-btn" onClick={() => setTabActiva('mercado')} title="Datos históricos TRM"><Database size={20} /></button>
+          <button className="icon-btn" onClick={() => setTabActiva('mercado')} title="Datos históricos TRM"><TrendingUp size={20} /></button>
+          <button className="icon-btn" onClick={() => navigate('/noticias-historicas')} title="Noticias históricas"><Database size={20} /></button>
         </nav>
         <button className="icon-btn danger" onClick={() => { localStorage.clear(); navigate('/login'); }} title="Cerrar sesión">
           <LogOut size={20} />
@@ -233,26 +238,26 @@ export default function DashboardPage() {
 
         {/* Header */}
         <header className="card" style={{
-          margin:'0.75rem 0.75rem 0 0.75rem', borderRadius:'1.5rem',
-          padding:'0.85rem 1.5rem', display:'flex', alignItems:'center',
-          justifyContent:'space-between', gap:'1rem', flexShrink:0,
+          margin:'0.85rem 0.85rem 0 0.85rem', borderRadius:'1.6rem',
+          padding:'1.15rem 1.75rem', display:'flex', alignItems:'center',
+          justifyContent:'space-between', gap:'1.5rem', minHeight:'120px', flexShrink:0,
         }}>
-          <div>
-            <span className="pill" style={{ display:'inline-flex', marginBottom:'0.35rem' }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:'0.55rem', paddingTop:'0.15rem' }}>
+            <span className="pill" style={{ display:'inline-flex', marginBottom:0 }}>
               <Activity size={11} /> Panel operativo
             </span>
-            <h1 style={{ fontFamily:'var(--font-title)', fontSize:'1.5rem', fontWeight:900, letterSpacing:'-0.04em' }}>
+            <h1 style={{ fontFamily:'var(--font-title)', fontSize:'clamp(1.8rem, 2.3vw, 2.35rem)', fontWeight:900, letterSpacing:'-0.045em', lineHeight:1.02 }}>
               FinSight <span style={{ color:'var(--blue)' }}>Colombia</span>
             </h1>
-            <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', marginTop:'0.12rem' }}>
-              <span className="label">{new Date().toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' })}</span>
+            <div style={{ display:'flex', alignItems:'center', gap:'0.65rem' }}>
+              <span className="label" style={{ letterSpacing:'0.18em' }}>{new Date().toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long' })}</span>
               <span className="dot-live" />
             </div>
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:'0.65rem' }}>
-            <div style={{ padding:'0.45rem 0.85rem', background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', textAlign:'right' }}>
-              <p style={{ fontSize:'0.68rem', fontWeight:800, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--text-1)' }}>{usuario}</p>
-              <p style={{ fontSize:'0.57rem', fontWeight:700, letterSpacing:'0.2em', textTransform:'uppercase', color:'var(--text-3)', marginTop:'0.1rem' }}>{esAdmin ? 'Administrador' : 'Analista'}</p>
+          <div style={{ display:'flex', alignItems:'center', gap:'0.8rem', flexWrap:'wrap', justifyContent:'flex-end' }}>
+            <div style={{ padding:'0.7rem 1rem', background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--radius-md)', textAlign:'right', minWidth:'160px' }}>
+              <p style={{ fontSize:'0.75rem', fontWeight:800, letterSpacing:'0.16em', textTransform:'uppercase', color:'var(--text-1)' }}>{usuario}</p>
+              <p style={{ fontSize:'0.6rem', fontWeight:700, letterSpacing:'0.22em', textTransform:'uppercase', color:'var(--text-3)', marginTop:'0.18rem' }}>{esAdmin ? 'Administrador' : 'Analista'}</p>
             </div>
             <button className="btn-ghost" onClick={limpiarBD}>Limpiar BD</button>
             <button className="btn-primary" onClick={iniciarScraping} disabled={scraping || scraperDone} style={{ whiteSpace:'nowrap' }}>
@@ -319,7 +324,7 @@ export default function DashboardPage() {
               >
                 {logs.length === 0 ? (
                   <p style={{ color:'var(--text-3)', fontStyle:'italic', lineHeight:1.5 }}>
-                    {scraping ? 'Conectando con el servidor…' : 'Presiona Sincronizar para iniciar la extracción de datos.'}
+                    {scraping ? 'Conectando con el servidor…' : 'Presiona Extraer datos para iniciar la actualización.'}
                   </p>
                 ) : (
                   <AnimatePresence initial={false}>
@@ -604,6 +609,14 @@ export default function DashboardPage() {
                   }
                 </div>
               )}
+              {/* Footer: cargar más (cliente) */}
+              <div style={{ display:'flex', justifyContent:'center', padding:'0.6rem 0' }}>
+                {noticias.length >= limitNoticias && (
+                  <button className="btn-ghost" onClick={() => setLimitNoticias(l => l + 30)} disabled={cargando}>
+                    {cargando ? 'Cargando…' : 'Cargar más'}
+                  </button>
+                )}
+              </div>
             </div>
           </aside>
 

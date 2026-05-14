@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, AlertCircle, ShieldCheck, Zap, ArrowRight, Activity, Globe2 } from 'lucide-react';
+import { Lock, Mail, AlertCircle, ShieldCheck, ArrowRight, Activity, Globe2 } from 'lucide-react';
+import logoImg from '../assets/FINSIGHT.png';
 import { motion } from 'framer-motion';
 
 const LoginPage = () => {
@@ -90,8 +91,8 @@ const LoginPage = () => {
               <span className="pill"><Activity size={11} /> Market Intelligence Suite</span>
 
               <div style={{ marginTop: '2.5rem' }}>
-                <div className="logo-icon" style={{ width: '3.5rem', height: '3.5rem', borderRadius: '1rem' }}>
-                  <Zap size={28} fill="currentColor" />
+                <div className="logo-mark logo-mark--hero" style={{ overflow:'hidden' }}>
+                  <img src={logoImg} alt="FinSight logo" />
                 </div>
                 <h1 style={{
                   fontFamily: 'var(--font-title)',
