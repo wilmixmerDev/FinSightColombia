@@ -59,20 +59,12 @@ El motor de predicción (`modelo.py`) combina un clasificador basado en Machine 
 
 ## Administración de Datos y Seeders
 
-El sistema provee herramientas de siembra (seeding) para poblar y restaurar la base de datos rápidamente:
+El sistema incluye scripts para inicializar y poblar la base de datos de forma sencilla:
 
-1.  **`setup_auth.py`**:
-    *   **Propósito**: Inicializa la tabla de `usuarios` y crea un usuario administrador por defecto (`admin@finsight.com` / `admin123`) para el acceso.
-    *   **Ejecución**: `python setup_auth.py`
-2.  **`seed_trm.py`**:
-    *   **Propósito**: Carga registros reales de la TRM consultando la API de **datos.gov.co** (BanRep) para los últimos $N$ días (por defecto 90). Si la API no responde, genera un modelo de simulación matemática (Random Walk) para asegurar la continuidad.
-    *   **Ejecución**: `python seed_trm.py`
-3.  **`seed_historicas.py`**:
-    *   **Propósito**: Genera 120 noticias históricas realistas estructuradas con titulares financieros específicos (ej. alzas de tasas, exportaciones) y las etiqueta con dirección del mercado para el entrenamiento del modelo.
-    *   **Ejecución**: `python seed_historicas.py`
-4.  **`seed_all.py`**:
-    *   **Propósito**: Orquestador general de pruebas. Limpia por completo las noticias, predicciones, datos de mercado e índices de sentimiento y establece datos de prueba listos para visualización.
-    *   **Ejecución**: `python seed_all.py`
+*   **`setup_auth.py`**: Crea la tabla de usuarios e inserta el administrador inicial (`admin@finsight.com` / `admin123`).
+*   **`seed_trm.py`**: Descarga la TRM real desde **datos.gov.co** (BanRep) para los últimos 90 días (o simula un Random Walk de contingencia si la API falla).
+*   **`seed_historicas.py`**: Genera 120 titulares financieros históricos etiquetados para entrenar el modelo de Machine Learning.
+*   **`seed_all.py`**: Limpia por completo la base de datos y monta el set de prueba inicial (noticias, histórico y predicciones mock).
 
 ---
 
@@ -111,8 +103,8 @@ FinSightColombia/
 ├── setup.py              # Setup inicial del sistema
 ├── setup_auth.py         # Creación de usuarios y roles
 ├── run.bat               # Script de arranque del backend
-├── requirements.txt      # Dependencias Python
-└── .env                  # Variables de entorno (no incluido en git)
+├── requirements.txt      # Dependencias del proyecto
+└── .env                  # Variables de entorno locales
 ```
 
 ---
@@ -141,19 +133,19 @@ copy .env.example .env
 # 4. Inicializar la base de datos
 psql -U postgres -f schema.sql
 
-# 5. Inicializar tablas de usuario y crear cuenta Admin
+# 5. Configurar tablas y usuario admin inicial
 python setup_auth.py
 
-# 6. Sembrar datos históricos de TRM y noticias para entrenamiento
+# 6. Poblar datos históricos de la TRM y noticias
 python seed_trm.py
 python seed_historicas.py
 
-# 7. Entrenar el modelo de inteligencia artificial
+# 7. Entrenar el modelo
 python modelo.py
 
-# 8. Iniciar el servidor FastAPI
+# 8. Arrancar el backend
 .\run.bat
-# o directamente: uvicorn main:app --reload
+# o bien: uvicorn main:app --reload
 ```
 
 ### Frontend
